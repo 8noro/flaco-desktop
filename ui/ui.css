@@ -1,0 +1,35 @@
+:root{color-scheme:dark light;--bg:#101014;--fg:#ececf1;--mut:#9a9aa8;--card:#18181e;--bd:#2a2a33;--acc:#b388ff;--ok:#5ad19a;--warn:#f0b24a}
+@media (prefers-color-scheme:light){:root{--bg:#f6f6f9;--fg:#18181e;--mut:#62626f;--card:#fff;--bd:#dcdce4;--acc:#6f3ed6;--ok:#14895a;--warn:#a96a00}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:520px;margin:0 auto;padding:22px 20px 28px}
+h1{font-size:20px;margin:0 0 4px}
+h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin:22px 0 8px}
+p.sub{margin:0 0 6px;color:var(--mut)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px 16px}
+label{display:block;font-weight:600;margin:12px 0 4px}
+label:first-child{margin-top:0}
+input[type=text],select{width:100%;padding:9px 11px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--fg);font:inherit}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.hint{font-size:13px;color:var(--mut);margin:4px 0 0}
+.row{display:flex;align-items:flex-start;gap:10px;margin:12px 0 0}
+.row input{margin-top:4px}
+.row b{display:block}
+.st{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:14px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--mut);margin-top:6px;flex:none}
+.dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}
+.bar{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;align-items:center}
+button,a.btn{font:inherit;padding:9px 16px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--fg);cursor:pointer;text-decoration:none;display:inline-block}
+button.pri,a.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+#msg{margin-right:auto;font-size:14px}
+#msg.err{color:#ff6b6b}#msg.ok{color:var(--ok)}
+
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.row2{display:flex;gap:8px}.row2 input{flex:1}
+button.sm{padding:2px 8px;font-size:12px;border-radius:6px}
+button.danger{color:#ff6b6b;border-color:#ff6b6b55}
+button:disabled{opacity:.5;cursor:default}
+.job{display:flex;align-items:center;gap:8px;font-size:13px;padding:5px 0;border-top:1px solid var(--bd)}
+.job .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.job progress{width:70px;height:8px}
+#dljobs{margin-top:8px;max-height:190px;overflow:auto}

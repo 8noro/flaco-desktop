@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'">
+<title>Ajustes del cliente · FLACo!</title><link rel="stylesheet" href="ui.css"></head>
+<body><main>
+<h1>Ajustes del cliente</h1>
+<p class="sub">FLACo! Desktop <span id="ver"></span> · la interfaz es la misma de la web, se actualiza sola con el servidor.</p>
+
+<h2>Servidor</h2>
+<div class="card">
+  <label for="url">URL de FLACo!</label>
+  <input id="url" type="text" spellcheck="false" autocomplete="off" placeholder="https://music.oron8.com">
+  <p class="hint">Al guardar con otra URL, la ventana carga ese servidor.</p>
+</div>
+
+<h2>Discord Rich Presence</h2>
+<div class="card">
+  <label for="presence">Presencia</label>
+  <select id="presence">
+    <option value="auto">Automática: la pone el cliente solo si el sistema no la tiene ya</option>
+    <option value="on">Siempre desde el cliente</option>
+    <option value="off">Desactivada</option>
+  </select>
+  <p class="hint">«Automática» detecta el servicio <code>flaco-presence</code> (instalar-presencia.sh) y, si está corriendo, no duplica la actividad en Discord.</p>
+  <label for="app">Application ID de Discord</label>
+  <input id="app" type="text" spellcheck="false" autocomplete="off" inputmode="numeric" placeholder="Solo números (discord.com/developers/applications)">
+  <p class="hint">Hace falta la app de escritorio de Discord abierta. No se usa API key: lee lo que suena directamente de la ventana, y respeta «Mostrar lo que escucho» de tu cuenta.</p>
+  <div class="st"><span class="dot" id="dot"></span><span id="pst">…</span></div>
+</div>
+
+<h2>Descargas sin conexión</h2>
+<div class="card">
+  <label for="dlq">Calidad por defecto</label>
+  <select id="dlq">
+    <option value="source">Original (Source)</option>
+    <option value="flac16">FLAC 16-bit / 44.1 kHz (los hi-res se reducen)</option>
+    <option value="mp3_320">MP3 320</option>
+    <option value="aac_256">AAC 256</option>
+    <option value="opus_128">Opus 128</option>
+  </select>
+  <p class="hint">Si un tema no ofrece esa calidad, se baja el original. Se guarda con «Guardar».</p>
+  <label for="dlc">Descargas simultáneas</label>
+  <select id="dlc"><option>1</option><option>2</option><option>3</option><option>4</option></select>
+  <div class="st"><span class="dot" id="dldot"></span><span id="dlst">…</span></div>
+  <p class="hint" id="dlstore"></p>
+  <div id="dljobs"></div>
+  <div class="btns">
+    <button id="dlpause">Pausar</button><button id="dlretry">Reintentar errores</button><button id="dlclear" class="danger">Borrar todas</button>
+  </div>
+  <label for="dlids">Probar con IDs de temas</label>
+  <div class="row2"><input id="dlids" type="text" spellcheck="false" autocomplete="off" placeholder="12, 13, 14"><button id="dlgo">Descargar</button></div>
+  <p class="hint">Todo se guarda cifrado (AES-256) en tu carpeta de datos. Los botones de descarga dentro de la web llegan en una próxima versión; mientras tanto se puede probar con los ID de los temas. Hay que haber iniciado sesión en la ventana principal.</p>
+</div>
+
+<h2>Ventana</h2>
+<div class="card">
+  <div class="row"><input id="tray" type="checkbox"><div><b>Cerrar a la bandeja</b><span class="hint">La X oculta la ventana y la música sigue; «Salir» está en la bandeja.</span></div></div>
+  <div class="row"><input id="min" type="checkbox"><div><b>Iniciar minimizado</b><span class="hint">Arranca directo en la bandeja.</span></div></div>
+</div>
+
+<div class="bar"><span id="msg"></span><button id="close">Cerrar</button><button id="save" class="pri">Guardar</button></div>
+</main><script src="settings.js"></script></body></html>
