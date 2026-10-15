@@ -1,0 +1,14 @@
+{
+  "name": "flaco-desktop",
+  "version": "1.1.0",
+  "description": "Cliente de escritorio de FLACo! con Discord Rich Presence",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron --ozone-platform-hint=auto .",
+    "test": "node test/test.js && node test/downloads.test.js && node test/main.test.js"
+  },
+  "devDependencies": {
+    "electron": "*"
+  }
+}
