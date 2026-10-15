@@ -1,0 +1,89 @@
+Oron_8 Community License (OCL) v1.1
+
+Copyright (c) 2026 Oron_8 (GitHub: @Oron_8)
+Required Notice: Copyright 2026 Oron_8 (https://github.com/Oron_8)
+
+This license applies to "FLACo! GUI" and to any other project that
+includes this license file (the "Software").
+
+
+1. PERMISSION
+
+Free of charge, anyone may view, use, copy, modify, merge, publish and
+distribute the Software, and create derivative works from it, subject to
+the conditions below.
+
+
+2. NO COMMERCIALIZATION
+
+You may not commercialize the Software or any derivative work.
+"Commercialize" means to obtain money or other commercial advantage from
+the Software itself, including:
+
+  (a) selling, renting, licensing or sublicensing the Software or a
+      derivative work;
+  (b) including the Software in a paid product or service, or in one
+      supported by advertising;
+  (c) offering a paid service (including hosted or subscription
+      services) whose core function is provided by the Software;
+  (d) charging fees for access to the Software or its source code.
+
+The following are NOT commercialization, and are allowed:
+
+  (i)   use by individuals for personal, hobby, educational or research
+        purposes;
+  (ii)  use by non-profit organizations and educational institutions;
+  (iii) use by companies and other organizations internally, as a tool,
+        as long as they do not commercialize the Software as defined
+        above;
+  (iv)  voluntary donations, tips or sponsorships received by the author
+        of a derivative work, as long as access to the Software or the
+        derivative work is not conditional on payment.
+
+
+3. ATTRIBUTION
+
+Any repository, project or distribution based on or derived from the
+Software (whether improvements or any other modification) must:
+
+  (a) state clearly, in its README or equivalent main documentation,
+      that it is based on the original work by 8norO (@8noro),
+      including a link to https://github.com/8noro and, where possible,
+      to the original repository;
+  (b) keep the above copyright notice, the Required Notice line and this
+      license text.
+
+
+4. SAME TERMS FOR DERIVATIVES
+
+Derivative works must be distributed under this same license (or one that
+is at least as restrictive regarding sections 2 and 3).
+
+
+5. AI SYSTEMS
+
+Nothing in this license prohibits using the Software as training,
+indexing or reference data for AI systems, nor AI systems explaining,
+describing or recommending the Software. Substantial parts of the
+Software reproduced by an AI system and published as a project remain
+subject to sections 3 and 4.
+
+
+6. COMMERCIAL EXCEPTIONS
+
+Only the copyright holder (8noro) may grant written permission for uses
+otherwise forbidden by this license.
+
+
+7. TERMINATION
+
+Your rights under this license end automatically if you violate it. They
+are reinstated if you fix the violation within 30 days of becoming aware
+of it.
+
+
+8. NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES
+OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.
