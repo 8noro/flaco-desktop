@@ -39,6 +39,16 @@
     <option value="opus_128">Opus 128</option>
   </select>
   <p class="hint">Si un tema no ofrece esa calidad, se baja el original. Se guarda con «Guardar».</p>
+  <div class="row"><input id="dlask" type="checkbox"><div><b>Preguntar la calidad cada vez</b><span class="hint">Al pulsar «Descargar» en la web aparece un selector. Sin marcar, «Descargar» es un solo clic con la calidad de arriba.</span></div></div>
+  <label for="dlexp">Caducidad de las descargas</label>
+  <select id="dlexp">
+    <option value="0">Nunca caducan</option>
+    <option value="7">Si pasan 7 días sin conectarte</option>
+    <option value="14">Si pasan 14 días sin conectarte</option>
+    <option value="30">Si pasan 30 días sin conectarte</option>
+    <option value="90">Si pasan 90 días sin conectarte</option>
+  </select>
+  <p class="hint">Cuando caducan no se borran: dejan de sonar hasta que abras FLACo! con conexión.</p>
   <label for="dlc">Descargas simultáneas</label>
   <select id="dlc"><option>1</option><option>2</option><option>3</option><option>4</option></select>
   <div class="st"><span class="dot" id="dldot"></span><span id="dlst">…</span></div>
@@ -49,7 +59,7 @@
   </div>
   <label for="dlids">Probar con IDs de temas</label>
   <div class="row2"><input id="dlids" type="text" spellcheck="false" autocomplete="off" placeholder="12, 13, 14"><button id="dlgo">Descargar</button></div>
-  <p class="hint">Todo se guarda cifrado (AES-256) en tu carpeta de datos. Los botones de descarga dentro de la web llegan en una próxima versión; mientras tanto se puede probar con los ID de los temas. Hay que haber iniciado sesión en la ventana principal.</p>
+  <p class="hint">Todo se guarda cifrado (AES-256) en tu carpeta de datos. Las descargas se piden desde la propia web (botón de descargar en cada tema, álbum, playlist, artista, Me gusta y cola); este cuadro con IDs queda para pruebas. Hay que haber iniciado sesión en la ventana principal.</p>
 </div>
 
 <h2>Ventana</h2>

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=FLACo!
+Comment=Cliente de escritorio de FLACo!
+Exec=flaco-desktop
+Icon=flaco-desktop
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+StartupWMClass=flaco-desktop

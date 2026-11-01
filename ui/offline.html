@@ -1,12 +1,22 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; connect-src http: https:">
-<title>FLACo!</title><link rel="stylesheet" href="ui.css"></head>
-<body><main style="padding-top:12vh;text-align:center">
-<h1>No pude conectar con FLACo!</h1>
-<p class="sub" id="where"></p>
-<p class="sub" id="why"></p>
-<p class="sub">Reintento solo cada pocos segundos.</p>
-<div class="bar" style="justify-content:center"><a class="btn pri" id="retry" href="#">Reintentar ahora</a><a class="btn" href="flaco-ajustes:">Ajustes del cliente</a></div>
-<p class="hint">Atajo de ajustes: Ctrl + , · o desde el ícono de la bandeja.</p>
-</main><script src="offline.js"></script></body></html>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; media-src 'self'; connect-src 'self'">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FLACo! · Sin conexión</title>
+<link rel="stylesheet" href="offline.css"></head>
+<body>
+<div id="app">
+  <nav id="rail" aria-label="Navegación"></nav>
+  <main id="main"><div id="offbar"></div><div id="view"></div></main>
+  <aside id="panel" aria-label="Letra"><div class="pin"><div class="tabs"><button class="on">Letra</button><button class="x" id="pclose" aria-label="Cerrar la letra"></button></div><div id="lyr" class="pb"></div></div></aside>
+  <footer id="bar">
+    <div class="np"><img id="cov" alt="" hidden><div class="ph" id="covph"></div><div><b id="ptitle">Nada sonando</b><span id="partist">Elige algo de lo descargado</span></div></div>
+    <div class="bc">
+      <div class="ctl"><button class="ibtn" id="bshuf" title="Aleatorio" aria-pressed="false"></button><button class="ibtn" id="bprev" title="Anterior"></button><button class="play" id="bplay" title="Reproducir / pausar"></button><button class="ibtn" id="bnext" title="Siguiente"></button><button class="ibtn" id="blyr" title="Letra"></button></div>
+      <div class="skr"><span id="tcur">0:00</span><div class="seek"><i class="bg"></i><i class="ps" id="ps"></i><input id="seek" type="range" min="0" max="1000" value="0" aria-label="Posición"></div><span id="tdur">0:00</span></div>
+    </div>
+    <div class="br"><button class="ibtn" id="bmute" title="Silenciar"></button><input class="vol" id="vol" type="range" min="0" max="100" value="100" aria-label="Volumen"></div>
+  </footer>
+</div>
+<div id="toast" hidden></div>
+<script src="offline.js"></script></body></html>

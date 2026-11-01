@@ -9,6 +9,7 @@ function paint(snap) {
     $('url').value = c.url; $('presence').value = c.presence; $('app').value = c.discordAppId || '';
     $('tray').checked = !!c.closeToTray; $('min').checked = !!c.startMinimized;
     $('dlq').value = c.dlQuality || 'source'; $('dlc').value = String(c.dlConcurrency || 2);
+    $('dlask').checked = !!c.dlAsk; $('dlexp').value = String(c.dlExpireDays || 0);
     loaded = true;
   }
   $('ver').textContent = 'v' + snap.version;
@@ -38,16 +39,29 @@ function paintDl(d) {
   $('dlpause').disabled = !!d.fatal; $('dlretry').disabled = !c.errors;
   const box = $('dljobs');
   box.textContent = '';
-  for (const j of d.jobs) {
-    const row = document.createElement('div'); row.className = 'job';
-    const t = document.createElement('span'); t.className = 't';
-    t.textContent = `${j.title || 'Tema ' + j.id} · ${STATE[j.state] || j.state}${j.state === 'downloading' ? ' ' + j.pct + '%' : ''}${j.error ? ' — ' + j.error : ''}`;
-    row.append(t);
-    if (j.state === 'downloading') { const pr = document.createElement('progress'); pr.max = 100; pr.value = j.pct; row.append(pr); }
-    for (const [act, label, title] of [['prioritize', '↑', 'Subir al frente'], ['cancel', '✕', 'Cancelar']]) {
-      const b = document.createElement('button'); b.className = 'sm'; b.textContent = label; b.title = title; b.dataset.act = act; b.dataset.id = j.id; row.append(b);
+  // Agrupado por álbum, con el progreso de cada uno (suma de lo bajado sobre lo que se sabe que pesa).
+  const groups = new Map();
+  for (const j of d.jobs) { const k = j.album || 'Sin álbum'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(j); }
+  for (const [album, js] of groups) {
+    if (groups.size > 1 || js.length > 1) {
+      const known = js.filter((j) => j.total), tot = known.reduce((n, j) => n + j.total, 0), got = known.reduce((n, j) => n + j.bytes, 0);
+      const h = document.createElement('div'); h.className = 'job'; h.style.fontWeight = '600';
+      const t = document.createElement('span'); t.className = 't'; t.textContent = `${album} · ${js.length} ${js.length === 1 ? 'tema' : 'temas'}${tot ? ' · ' + Math.round(got * 100 / tot) + '%' : ''}`;
+      h.append(t);
+      if (tot) { const pr = document.createElement('progress'); pr.max = 100; pr.value = Math.round(got * 100 / tot); h.append(pr); }
+      box.append(h);
     }
-    box.append(row);
+    for (const j of js) {
+      const row = document.createElement('div'); row.className = 'job';
+      const t = document.createElement('span'); t.className = 't';
+      t.textContent = `${j.title || 'Tema ' + j.id} · ${STATE[j.state] || j.state}${j.state === 'downloading' ? ' ' + j.pct + '%' : ''}${j.error ? ' — ' + j.error : ''}`;
+      row.append(t);
+      if (j.state === 'downloading') { const pr = document.createElement('progress'); pr.max = 100; pr.value = j.pct; row.append(pr); }
+      for (const [act, label, title] of [['prioritize', '↑', 'Subir al frente'], ['cancel', '✕', 'Cancelar']]) {
+        const b = document.createElement('button'); b.className = 'sm'; b.textContent = label; b.title = title; b.dataset.act = act; b.dataset.id = j.id; row.append(b);
+      }
+      box.append(row);
+    }
   }
 }
 async function dlDo(act, arg) {
@@ -76,7 +90,7 @@ $('save').onclick = async () => {
   const r = await window.flacoCfg.set({
     url: $('url').value, presence: $('presence').value, discordAppId: $('app').value,
     closeToTray: $('tray').checked, startMinimized: $('min').checked,
-    dlQuality: $('dlq').value, dlConcurrency: Number($('dlc').value),
+    dlQuality: $('dlq').value, dlConcurrency: Number($('dlc').value), dlAsk: $('dlask').checked, dlExpireDays: Number($('dlexp').value),
   });
   if (r && r.error) { m.className = 'err'; m.textContent = r.error; return; }
   m.className = 'ok'; m.textContent = 'Guardado';

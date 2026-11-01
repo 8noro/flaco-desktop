@@ -1,15 +1,21 @@
 'use strict';
 const path = require('path');
 const crypto = require('crypto');
-const { app, BrowserWindow, Tray, Menu, nativeImage, shell, ipcMain, session, safeStorage } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, shell, ipcMain, session, safeStorage, protocol, net } = require('electron');
 const { Config } = require('./config');
 const { PresenceManager } = require('./presence');
 const { DownloadManager } = require('./downloads');
 const { KeyVault } = require('./dl-crypto');
+const { createHandler, SCHEME, ORIGIN } = require('./offline-protocol');
+const { Bridge } = require('./bridge');
+const { syncPlays } = require('./sync');
 
 const ICON = path.join(__dirname, 'icon.png');
 const UI = (f) => path.join(__dirname, 'ui', f);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// flaco-dl:// (pantalla sin conexión + audio descargado, descifrado al vuelo): hay que declararlo antes de que la app esté lista.
+protocol.registerSchemesAsPrivileged([{ scheme: SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);
 
 // Audio sin gestos previos, teclas multimedia (MPRIS en Linux) y Wayland nativo.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
@@ -22,10 +28,46 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 let cfg, win = null, tray = null, settingsWin = null, presence = null, dl = null, dlVault = null;
-let pageState = null, quitting = false, cleaned = false, boundsT = null;
+let pageState = null, quitting = false, cleaned = false, boundsT = null, bridge = null, syncing = false, lastKeepSync = 0;
+let lastOnline = null, offFails = 0, lastTheme = '';
+
+// ---- ¿hay conexión con el servidor? ----
+// OJO: no alcanza con did-fail-load. La web instala un service worker que, sin red, sirve la página guardada: la ventana «carga bien»
+// aunque no haya internet y la pantalla sin conexión nunca salía. Por eso se pregunta desde el proceso principal (que no pasa por el
+// service worker): cualquier respuesta que no sea 5xx cuenta como conexión (el túnel caído contesta 530).
+async function probe(ms = 5000) {
+  try { if (net && typeof net.isOnline === 'function' && !net.isOnline()) return false; } catch { /* sigue */ }
+  try {
+    const ses = session.defaultSession, f = typeof ses.fetch === 'function' ? ses.fetch.bind(ses) : net.fetch.bind(net);
+    const r = await f(cfg.get().url.replace(/\/+$/, '') + '/healthz', { cache: 'no-store', signal: AbortSignal.timeout(ms) });
+    if (r.body) r.body.cancel().catch(() => {});
+    return r.status < 500;
+  } catch { return false; }
+}
+const onWeb = () => !!win && !win.isDestroyed() && !isOfflinePage(win.webContents.getURL()) && sameOrigin(win.webContents.getURL());
+// Cada 5 s, con la web abierta: si el servidor no contesta (2 veces seguidas; 6 si está sonando algo, para no cortar la música por un bache), pasa a la pantalla sin conexión.
+async function watchdog() {
+  if (!onWeb() || win.webContents.isLoading()) { offFails = 0; return; }
+  const ok = await probe(4000);
+  if (ok) { offFails = 0; if (lastOnline === false) syncSoon(); lastOnline = true; return; }
+  offFails++;
+  const playing = !!(pageState && pageState.playing);
+  if (offFails >= (playing ? 6 : 2) && onWeb()) { offFails = 0; lastOnline = false; showOffline({ e: 'sin conexión con el servidor' }); }
+}
 
 // ---- lo que suena: se lee del estado de la propia pagina (const S, A(), toggle/next/prev de la UI web) ----
 const { READ_JS } = require('./page-state');
+
+const isOfflinePage = (u) => typeof u === 'string' && u.startsWith(ORIGIN + '/app/');
+
+// Pantalla local con lo descargado. `manual`: la abrió el usuario (no por falta de conexión).
+function showOffline(opts = {}) {
+  if (!win || win.isDestroyed()) { createWindow(opts); return; }
+  const q = new URLSearchParams({ u: cfg.get().url, e: opts.e || '', th: lastTheme || cfg.get().lastTheme || 'dark' });
+  if (opts.manual) q.set('m', '1');
+  win.loadURL(`${ORIGIN}/app/offline.html?${q}`);
+  if (opts.manual) showWin();
+}
 
 function sameOrigin(u) {
   try { return new URL(u).origin === new URL(cfg.get().url).origin; } catch { return false; }
@@ -34,10 +76,13 @@ function sameOrigin(u) {
 async function readPageState() {
   if (!win || win.isDestroyed()) return null;
   const wc = win.webContents;
-  if (wc.isLoading() || !sameOrigin(wc.getURL())) return null;
+  const offline = isOfflinePage(wc.getURL());
+  if (wc.isLoading() || (!offline && !sameOrigin(wc.getURL()))) return null;
   try {
     const r = await Promise.race([wc.executeJavaScript(READ_JS, false), sleep(1500).then(() => null)]);
-    return r ? Object.assign(r, { at: Date.now() }) : null;
+    // En la pantalla sin conexión se lee igual (bandeja), pero no se publica en Discord.
+    if (r && !offline && r.theme && r.theme !== lastTheme) { lastTheme = r.theme; if (r.theme !== cfg.get().lastTheme) cfg.set({ lastTheme: r.theme }); }
+    return r ? Object.assign(r, { at: Date.now() }, offline ? { share: false } : {}) : null;
   } catch { return null; }
 }
 
@@ -47,7 +92,7 @@ function control(fn) {
 }
 
 // ---- ventana principal: la misma UI de la web ----
-function createWindow() {
+function createWindow(launch = {}) {
   const c = cfg.get();
   const b = c.bounds || {};
   const opts = {
@@ -83,9 +128,17 @@ function createWindow() {
   const wc = win.webContents;
   wc.on('did-fail-load', (_e, code, desc, _url, isMain) => {
     if (!isMain || code === -3) return; // -3 = carga cancelada (navegación normal)
-    win.loadFile(UI('offline.html'), { query: { u: cfg.get().url, e: desc || '' } });
+    showOffline({ e: desc || '' });
   });
-  win.loadURL(c.url);
+  // El servidor o el túnel caídos suelen contestar una página de error 5xx (p. ej. 530 de Cloudflare): tampoco sirve, se muestra lo descargado.
+  wc.on('did-navigate', (_e, url, code) => {
+    if (code >= 500 && sameOrigin(url)) showOffline({ e: 'HTTP ' + code });
+  });
+  // Con la web ya parseada se inyecta window.flacoDesktop (solo en páginas del servidor): ver bridge.js.
+  wc.on('dom-ready', () => { if (bridge && sameOrigin(wc.getURL())) bridge.tick(true); });
+  wc.on('did-finish-load', () => { if (onWeb()) probe(4000).then((ok) => { if (!ok && onWeb()) { lastOnline = false; showOffline({ e: 'sin conexión con el servidor' }); } }); });
+  if (launch.manual) showOffline(launch);
+  else probe(3000).then((ok) => { if (!win || win.isDestroyed()) return; if (ok) { lastOnline = true; win.loadURL(c.url); } else { lastOnline = false; showOffline({ e: 'sin conexión con el servidor' }); } });
 }
 
 function showWin() {
@@ -107,7 +160,7 @@ app.on('web-contents-created', (_e, wc) => {
   wc.on('will-navigate', (e, url) => {
     if (url === 'flaco-ajustes:' || url.startsWith('flaco-ajustes:')) { e.preventDefault(); openSettings(); return; }
     if (sameOrigin(url)) return;
-    if (wc.getURL().startsWith('file:') && /^https?:/i.test(url)) return;
+    if ((wc.getURL().startsWith('file:') || isOfflinePage(wc.getURL())) && /^https?:/i.test(url)) return;
     e.preventDefault();
     if (/^(https?|mailto):/i.test(url)) shell.openExternal(url);
   });
@@ -139,6 +192,7 @@ function rebuildTray() {
     { label: 'Siguiente', click: () => control('next') },
     { type: 'separator' },
     { label: vis ? 'Ocultar ventana' : 'Mostrar FLACo!', click: toggleWin },
+    { label: 'Descargas sin conexión', click: () => showOffline({ manual: true }) },
     { label: 'Ajustes del cliente…', click: openSettings },
     { label: 'Discord: ' + st.text, enabled: false },
     ...(dlText ? [{ type: 'separator' }, { label: dlText, enabled: false },
@@ -195,9 +249,10 @@ async function makeDownloads() {
     getBase: () => cfg.get().url,
     getQuality: () => cfg.get().dlQuality,
     getConcurrency: () => cfg.get().dlConcurrency,
+    getExpireDays: () => cfg.get().dlExpireDays,
     log: (...a) => console.log('descargas:', ...a),
   });
-  dl.on('state', () => rebuildTray());
+  dl.on('state', () => { rebuildTray(); if (bridge) bridge.markDirty(); });
   dl.on('auth', () => console.log('descargas: hace falta iniciar sesión en la ventana; la cola queda en pausa hasta que reanudes'));
   await dl.init();
 }
@@ -250,22 +305,45 @@ ipcMain.handle('cfg:set', async (e, p) => {
     if (!(n >= 1 && n <= 4)) return { error: 'Las descargas simultáneas van de 1 a 4' };
     patch.dlConcurrency = n;
   }
+  if (typeof p.dlAsk === 'boolean') patch.dlAsk = p.dlAsk;
+  if (p.dlExpireDays != null) {
+    const n = Math.trunc(Number(p.dlExpireDays));
+    if (!(n >= 0 && n <= 3650)) return { error: 'La caducidad va de 0 (nunca) a 3650 días' };
+    patch.dlExpireDays = n;
+  }
   const urlChanged = patch.url && patch.url !== cfg.get().url;
   const oldOrigin = dlOrigin();
   cfg.set(patch);
   if (urlChanged && win && !win.isDestroyed()) win.loadURL(cfg.get().url);
   if (urlChanged && dlOrigin() !== oldOrigin) await makeDownloads();
   else if (dl) dl.kick();
+  if (bridge) bridge.markDirty();
   presence.forceRecheck();
   trayKey = '';
   rebuildTray();
   return { ok: true, state: snapshot() };
 });
 
+async function syncNow() {
+  if (syncing || !dl || !dl.ready) return;
+  syncing = true;
+  try {
+    if (!(await probe(4000))) { lastOnline = false; return; }
+    lastOnline = true; dl.touchOnline();
+    const ses = session.defaultSession;
+    const f = (u, o) => (typeof ses.fetch === 'function' ? ses.fetch(u, { ...o, credentials: 'include' }) : net.fetch(u, { ...o, credentials: 'include' }));
+    const me = (bridge && bridge.me) || dl.idx.user || '';
+    await syncPlays(dl, { fetch: f, base: cfg.get().url, me, log: (...a) => console.log(...a) });
+    if (Date.now() - lastKeepSync > 10 * 60 * 1000) { lastKeepSync = Date.now(); await dl.syncKeep(); }
+  } catch (e) { console.error('sincronización:', e.message); } finally { syncing = false; }
+}
+function syncSoon() { setTimeout(() => { syncNow().catch(() => {}); }, 1500); }
+
 // ---- salir ----
 function quit() { app.quit(); }
 app.on('before-quit', (e) => {
   quitting = true;
+  if (bridge) bridge.stop();
   if (cleaned) return;
   e.preventDefault();
   cleaned = true;
@@ -286,6 +364,7 @@ app.whenReady().then(() => {
 
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'Archivo', submenu: [
+      { label: 'Descargas sin conexión', accelerator: 'CmdOrCtrl+Shift+O', click: () => showOffline({ manual: true }) },
       { label: 'Ajustes del cliente…', accelerator: 'CmdOrCtrl+,', click: openSettings },
       { type: 'separator' },
       { label: 'Salir', accelerator: 'CmdOrCtrl+Q', click: quit },
@@ -299,6 +378,16 @@ app.whenReady().then(() => {
   presence = new PresenceManager({ getConfig: () => cfg.get(), readState: readPageState, log: (...a) => console.log(...a) });
   presence.on('status', () => rebuildTray());
 
+  protocol.handle(SCHEME, createHandler({ getDl: () => dl, uiDir: path.join(__dirname, 'ui'), probe: () => probe(4000) }));
+  bridge = new Bridge({
+    getWc: () => (win && !win.isDestroyed() ? win.webContents : null), getDl: () => dl, getCfg: () => cfg.get(), isServerUrl: sameOrigin,
+    version: app.getVersion(), openDownloads: openSettings, log: (...a) => console.log('puente:', ...a),
+  });
+  bridge.start();
+  // Sincronización: cuenta las reproducciones/vistas hechas sin conexión y (cada 10 min) baja lo nuevo de lo «mantener descargado».
+  // Corre siempre que el servidor conteste, aunque estés en la pantalla sin conexión (usa la cuenta con la que se abrió la web por última vez).
+  setInterval(() => { syncNow().catch(() => {}); }, 20000);
+  setInterval(() => { watchdog().catch(() => {}); }, 5000);
   makeDownloads().catch((e) => console.error('No pude iniciar las descargas:', e.message)); // no bloquea la ventana
   createWindow();
   buildTray();

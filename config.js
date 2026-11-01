@@ -10,7 +10,10 @@ const DEFAULTS = {
   closeToTray: true,
   startMinimized: false,
   dlQuality: 'source',     // calidad por defecto de las descargas: source | flac16 | mp3_320 | ...
+  lastTheme: 'dark',       // tema de la web (dark|midnight|light) para que la pantalla sin conexión se vea igual
   dlConcurrency: 2,        // descargas simultáneas (1 a 4)
+  dlAsk: false,            // preguntar la calidad cada vez que se descarga desde la web
+  dlExpireDays: 0,         // 0 = no caducan; N = si pasan N días sin ver el servidor, las descargas no suenan hasta reconectar
   maximized: false,
   bounds: { width: 1280, height: 800 },
 };

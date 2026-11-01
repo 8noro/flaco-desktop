@@ -31,15 +31,22 @@ function httpError(status) {
 }
 
 const rand = () => crypto.randomBytes(16).toString('hex');
+// keep: «mantener descargado» (álbum/playlist/artista/me gusta) · plays: reproducciones hechas sin conexión, pendientes de contar en el servidor
+// user: la cuenta con la que se abrió la web por última vez · lastOnline: última vez que se vio el servidor (para la caducidad opcional)
+const emptyIdx = () => ({ v: 1, tracks: {}, covers: {}, jobs: {}, paused: false, seq: 0, keep: {}, plays: [], user: '', lastOnline: 0 });
+const KEEP_KINDS = { album: (id) => `/api/album/${id}`, artist: (id) => `/api/artist/${id}`, playlist: (id) => `/api/playlist/${id}`, liked: () => '/api/likes?full=1' };
+const clip = (v, n = 200) => String(v == null ? '' : v).replace(/[\u0000-\u001f]/g, ' ').slice(0, n);
+const MAX_PLAYS = 2000;
 
 class DownloadManager extends EventEmitter {
-  constructor({ dir, vault, fetch, getBase, getQuality = () => 'source', getConcurrency = () => 2, log = () => {},
+  constructor({ dir, vault, fetch, getBase, getQuality = () => 'source', getConcurrency = () => 2, getExpireDays = () => 0, log = () => {},
     stallMs = 30000, headerMs = 10 * 60 * 1000, retryMs = RETRY_MS, statfs = null }) {
     super();
-    Object.assign(this, { dir, vault, fetch, getBase, getQuality, getConcurrency, log, stallMs, headerMs, retryMs });
+    Object.assign(this, { dir, vault, fetch, getBase, getQuality, getConcurrency, getExpireDays, log, stallMs, headerMs, retryMs });
     this.statfs = statfs || ((p) => (fsp.statfs ? fsp.statfs(p) : Promise.reject(new Error('sin statfs'))));
     this.master = null;
-    this.idx = { v: 1, tracks: {}, covers: {}, jobs: {}, paused: false, seq: 0 };
+    this.idx = emptyIdx();
+    this.rev = 0;              // sube cada vez que cambia el conjunto de temas descargados (para no recalcular de más)
     this.active = new Map();   // id -> { ctl, writer, bytes, total }
     this.running = new Set();  // promesas de las descargas en curso
     this.authBlocked = false;
@@ -65,6 +72,7 @@ class DownloadManager extends EventEmitter {
       return this;
     }
     for (const j of Object.values(this.idx.jobs)) if (j.state === 'downloading') j.state = 'queued';
+    if (!this.idx.lastOnline) this.idx.lastOnline = Date.now(); // primera vez con caducidad: se cuenta desde ahora
     await this._cleanOrphans();
     this.ready = true;
     this._changed();
@@ -89,7 +97,7 @@ class DownloadManager extends EventEmitter {
     try { names = await fsp.readdir(this.dir); } catch { /* ignorar */ }
     await Promise.all(names.filter((n) => FILE_RE.test(n) || n === 'index.bin').map((n) => fsp.rm(path.join(this.dir, n), { force: true })));
     this.master = this.vault.reset();
-    this.idx = { v: 1, tracks: {}, covers: {}, jobs: {}, paused: false, seq: 0 };
+    this.idx = emptyIdx(); this.rev++;
     this.fatal = ''; this.ready = true; this.authBlocked = false; this.stopped = false;
     await this.flush();
     this._changed();
@@ -102,6 +110,7 @@ class DownloadManager extends EventEmitter {
     try {
       const j = JSON.parse(openBlob(this.master, 'index', blob).toString('utf8'));
       if (j && j.v === 1) this.idx = Object.assign(this.idx, j);
+      for (const [k, d] of Object.entries(emptyIdx())) if (this.idx[k] == null) this.idx[k] = d; // índices de versiones anteriores
     } catch { throw new Error('El índice de descargas está dañado o se cifró con otra clave.'); }
   }
 
@@ -146,6 +155,7 @@ class DownloadManager extends EventEmitter {
     for (const it of items) {
       const id = Math.trunc(Number(typeof it === 'object' ? it.id : it));
       const q = (typeof it === 'object' && it.q) || '';
+      const hint = typeof it === 'object' ? { title: clip(it.title), album: clip(it.album), album_id: Math.trunc(Number(it.album_id)) > 0 ? Math.trunc(Number(it.album_id)) : 0 } : {};
       if (!(id > 0)) { skipped++; continue; }
       const have = this.idx.tracks[id];
       const job = this.idx.jobs[id];
@@ -155,7 +165,7 @@ class DownloadManager extends EventEmitter {
         continue;
       }
       if (have && (!q || q === have.qWanted)) { skipped++; continue; } // ya está (con la calidad pedida)
-      this.idx.jobs[id] = { id, q: q || want, state: 'queued', prio: top ? minPrio - 1 - (items.length - n) : 0, seq: ++this.idx.seq, tries: 0, error: '', notBefore: 0, part: null, title: '' };
+      this.idx.jobs[id] = { id, q: q || want, state: 'queued', prio: top ? minPrio - 1 - (items.length - n) : 0, seq: ++this.idx.seq, tries: 0, error: '', notBefore: 0, part: null, title: hint.title || '', album: hint.album || '', album_id: hint.album_id || 0 };
       n++; added++;
     }
     this._changed(); this._kick();
@@ -224,7 +234,7 @@ class DownloadManager extends EventEmitter {
       await this.cancel(id);
       const t = this.idx.tracks[id];
       if (!t) continue;
-      delete this.idx.tracks[id];
+      delete this.idx.tracks[id]; this.rev++;
       await this._rm(t.file);
       if (t.lyr) await this._rm(t.lyr.file);
       const al = t.meta && t.meta.album_id;
@@ -266,8 +276,9 @@ class DownloadManager extends EventEmitter {
 
   // ---------- consultas (las usa la tanda 2: reproducción y pantalla sin conexión) ----------
   has(id) { return !!this.idx.tracks[id]; }
-  trackMeta(id) { const t = this.idx.tracks[id]; return t ? Object.assign({}, t.meta, { dl: { q: t.q, size: t.size, at: t.at } }) : null; }
-  list() { return Object.values(this.idx.tracks).map((t) => Object.assign({}, t.meta, { dl: { q: t.q, size: t.size, at: t.at } })); }
+  _dlInfo(t) { return { q: t.q, size: t.size, at: t.at, lyr: !!t.lyr }; }
+  trackMeta(id) { const t = this.idx.tracks[id]; return t ? Object.assign({}, t.meta, { dl: this._dlInfo(t) }) : null; }
+  list() { return Object.values(this.idx.tracks).map((t) => Object.assign({}, t.meta, { dl: this._dlInfo(t) })); }
   async openAudio(id) {
     const t = this.idx.tracks[id];
     if (!t) throw new Error('Ese tema no está descargado');
@@ -284,20 +295,78 @@ class DownloadManager extends EventEmitter {
     return t && t.lyr ? JSON.parse(openBlob(this.master, 'lyrics', await fsp.readFile(this._p(t.lyr.file))).toString('utf8')) : null;
   }
 
+  // ---------- mantener descargado ----------
+  keepKey(kind, id) { return `${kind}:${Math.max(0, Math.trunc(Number(id)) || 0)}`; }
+  setKeep(kind, id, name, on) {
+    if (!Object.prototype.hasOwnProperty.call(KEEP_KINDS, kind)) return false;
+    const key = this.keepKey(kind, id);
+    if (on) this.idx.keep[key] = { kind, id: Math.max(0, Math.trunc(Number(id)) || 0), name: clip(name, 120), at: Date.now() };
+    else delete this.idx.keep[key];
+    this._changed();
+    return true;
+  }
+  keeps() { return Object.keys(this.idx.keep); }
+  // Baja lo que falte de las colecciones marcadas (todas, o solo `only` = una clave). Si la colección ya no existe, deja de vigilarla.
+  async syncKeep(only) {
+    if (!this.ready || this.stopped) return { added: 0 };
+    let added = 0;
+    for (const key of Object.keys(this.idx.keep)) {
+      if (only && key !== only) continue;
+      const k = this.idx.keep[key];
+      if (!k || !KEEP_KINDS[k.kind]) continue;
+      try {
+        const r = await this._json(KEEP_KINDS[k.kind](k.id));
+        const items = ((r && r.tracks) || []).filter((t) => t && t.id > 0).map((t) => ({ id: t.id, title: t.title, album: t.album, album_id: t.album_id }));
+        added += this.enqueue(items).added;
+        k.checked = Date.now();
+      } catch (e) {
+        if (e instanceof FatalError) { delete this.idx.keep[key]; this._changed(); } // 404: la playlist/álbum ya no existe
+        else this.log('mantener descargado:', key, e.message);
+      }
+    }
+    this._save();
+    return { added };
+  }
+
+  // ---------- reproducciones hechas sin conexión (se cuentan en el servidor cuando vuelve la conexión) ----------
+  setUser(u) { u = clip(u, 80).toLowerCase(); if (u !== this.idx.user) { this.idx.user = u; this._save(); } }
+  // upd: actualiza los segundos de una reproducción ya registrada (mismo tema y mismo instante), como hace la web.
+  logPlay({ id, sec, ts, view = false, upd = false }) {
+    id = Math.trunc(Number(id)); sec = Number(sec); ts = Number(ts);
+    if (!(id > 0) || !this.idx.tracks[id] || !Number.isFinite(sec) || sec < 0 || sec > 36000 || !Number.isFinite(ts) || ts < 1e9 || ts > Date.now() / 1000 + 120) return false;
+    sec = Math.round(sec);
+    const old = upd ? this.idx.plays.find((p) => p.id === id && p.ts === ts) : null;
+    if (old) { if (sec > old.sec) old.sec = sec; if (view) old.v = 1; } else {
+      this.idx.plays.push({ id, sec, ts, v: view ? 1 : 0, u: this.idx.user || '' });
+      if (this.idx.plays.length > MAX_PLAYS) this.idx.plays.splice(0, this.idx.plays.length - MAX_PLAYS);
+    }
+    this._save();
+    return true;
+  }
+  playsPending() { return this.idx.plays.slice(); }
+  ackPlays(done) { const s = new Set(done); this.idx.plays = this.idx.plays.filter((p) => !s.has(p)); this._save(); }
+
+  // ---------- caducidad opcional: si hace más de N días que no ves el servidor, las descargas no suenan hasta reconectar ----------
+  touchOnline() { const n = Date.now(); if (n - (this.idx.lastOnline || 0) > 60000) { this.idx.lastOnline = n; this._save(); } }
+  isExpired() {
+    const days = Number(this.getExpireDays()) || 0;
+    return days > 0 && !!this.idx.lastOnline && Date.now() - this.idx.lastOnline > days * 86400000;
+  }
+
   getState() {
     const downloaded = {};
     let bytes = 0;
-    for (const t of Object.values(this.idx.tracks)) { downloaded[t.id] = { q: t.q, size: t.size, at: t.at }; bytes += t.size; }
+    for (const t of Object.values(this.idx.tracks)) { downloaded[t.id] = { q: t.q, size: t.size, at: t.at, al: (t.meta && t.meta.album_id) || 0, ar: (t.meta && t.meta.artist_id) || 0 }; bytes += t.size; }
     const jobs = Object.values(this.idx.jobs).sort((a, b) => a.prio - b.prio || a.seq - b.seq).map((j) => {
       const a = this.active.get(j.id);
       const total = a ? a.total : (j.part ? j.part.total : 0);
       const done = a ? a.bytes : 0;
-      return { id: j.id, title: j.title || '', q: j.qEff || j.q, state: a ? 'downloading' : j.state, bytes: done, total,
+      return { id: j.id, title: j.title || '', album: j.album || '', album_id: j.album_id || 0, q: j.qEff || j.q, state: a ? 'downloading' : j.state, bytes: done, total,
         pct: total ? Math.min(100, Math.round(done * 100 / total)) : 0, error: j.error || '', tries: j.tries || 0 };
     });
     return {
       ready: this.ready, fatal: this.fatal, paused: !!this.idx.paused, authBlocked: this.authBlocked,
-      storage: this.vault.status, downloaded, bytes, jobs,
+      storage: this.vault.status, downloaded, bytes, jobs, keep: Object.keys(this.idx.keep), expired: this.isExpired(), rev: this.rev,
       counts: { downloaded: Object.keys(downloaded).length, queued: jobs.filter((j) => j.state === 'queued' || j.state === 'downloading').length, errors: jobs.filter((j) => j.state === 'error').length },
     };
   }
@@ -414,6 +483,8 @@ class DownloadManager extends EventEmitter {
     const meta = plan && plan.source;
     if (!meta || !meta.id) throw new FatalError('El servidor no devolvió los datos del tema');
     job.title = meta.title || '';
+    if (meta.album) job.album = clip(meta.album);
+    if (meta.album_id) job.album_id = Math.trunc(Number(meta.album_id)) || 0;
     const opts = (plan.options || []).map((o) => o.id);
     let q = job.q || this.getQuality() || 'source';
     if (q !== 'source' && !opts.includes(q)) q = 'source'; // p. ej. flac16 en un tema que no es hi-res
@@ -512,6 +583,7 @@ class DownloadManager extends EventEmitter {
     // 4) listo: se anota en el índice (si había otra calidad del mismo tema, se borra)
     const old = this.idx.tracks[id];
     this.idx.tracks[id] = { id, q, qWanted: job.q, file: audio.file, size: audio.size, etag: audio.etag, mime: audio.mime, at: Date.now(), meta, lyr };
+    this.rev++;
     delete this.idx.jobs[id];
     if (old) { await this._rm(old.file); if (old.lyr) await this._rm(old.lyr.file); }
     await this.flush();
