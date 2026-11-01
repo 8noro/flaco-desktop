@@ -36,6 +36,16 @@ FLACo! Desktop is based on the original work by [8norO (@8noro)](https://github.
 
 ### Arch Linux, CachyOS, and EndeavourOS
 
+#### Recommended: one-command install
+
+```bash
+curl -fsSL oron8.com/flaco | bash
+```
+
+This installer adds the `oron8` repository to `/etc/pacman.conf` if it is not already configured, then updates package databases and installs FLACo! Desktop. It is only for systems with `pacman`.
+
+#### Manual repository setup
+
 Add the repository to the end of `/etc/pacman.conf`:
 
 ```ini
@@ -50,23 +60,13 @@ Then install FLACo! Desktop:
 sudo pacman -Syu flaco-desktop
 ```
 
-### Manual installation
-
-Clone or download this repository, then run the installer from its directory:
-
-```bash
-bash install.sh
-```
-
-The installer sets up FLACo! Desktop under `~/.local`, adds an application-menu shortcut, and installs the `flaco-desktop` command in `~/.local/bin`. If Electron is not installed system-wide, it installs a local copy for the app.
-
 To uninstall:
 
 ```bash
-bash install.sh --quitar
+sudo pacman -Rns flaco-desktop
 ```
 
-> **Warning:** uninstalling also deletes FLACo! Desktop's settings and offline downloads.
+> **Warning:** uninstalling removes the app, but settings and offline downloads may remain in your user data directory.
 
 ## Run from source
 
