@@ -8,7 +8,7 @@ url="https://github.com/8noro/flaco-desktop"
 license=('LicenseRef-OCL-1.1')
 depends=('electron')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('86fa60c7a730de24c478b5a936909d43c573eb1aa134c6263c7edab871175a84')
 
 package() {
   cd "$srcdir/flaco-desktop-$pkgver"
