@@ -34,6 +34,24 @@ FLACo! Desktop is based on the original work by [8norO (@8noro)](https://github.
 
 ## Installation
 
+### Arch Linux, CachyOS, and EndeavourOS
+
+Add the repository to the end of `/etc/pacman.conf`:
+
+```ini
+[oron8]
+SigLevel = Optional TrustAll
+Server = https://github.com/8noro/flaco-desktop/releases/download/repo
+```
+
+Then install FLACo! Desktop:
+
+```bash
+sudo pacman -Syu flaco-desktop
+```
+
+### Manual installation
+
 Clone or download this repository, then run the installer from its directory:
 
 ```bash
