@@ -1,0 +1,9 @@
+node_modules/
+package-lock.json
+dist/
+*.log
+.env
+*.pkg.tar.zst
+src/
+pkg/
+*.tar.gz
