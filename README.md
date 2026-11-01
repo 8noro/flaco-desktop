@@ -14,7 +14,7 @@ The app opens the FLACo! web player in its own desktop window and adds desktop i
 
 > **Windows:** Download the Windows version from the [Releases page](https://github.com/8noro/flaco-desktop/releases). **macOS support is coming soon.**
 
-FLACo! Desktop is based on the original work by [8norO (@8noro)](https://github.com/8noro), including the [original repository](https://github.com/8noro/flaco-desktop).
+FLACo! Desktop is based on the original work by [Oron_8 (@Oron8)](https://github.com/Oron8).
 
 ## Features
 
