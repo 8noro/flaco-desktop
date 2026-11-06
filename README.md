@@ -21,16 +21,15 @@ FLACo! Desktop is based on the original work by [Oron_8 (@Oron8)](https://github
 - **Desktop player:** standalone window, system tray, and system media controls (MPRIS).
 - **Offline mode:** download music from the web player and listen through a built-in local interface when you're offline.
 - **Download manager:** queue, pause, retries, configurable concurrency and audio quality. Keep albums, playlists, artists, and liked tracks downloaded.
-- **Encrypted storage:** downloads are encrypted with AES-256. The encryption key is protected by the system keychain when available.
 - **Discord Rich Presence:** show what you're listening to, with automatic detection to avoid conflicts with `flaco-presence`.
 - **Client settings:** customize the server URL, presence, download quality, and window behavior.
 
 ## Requirements
 
-- Linux.
+- **Linux _(recommended)_** or Windows
 - Node.js and npm to run from source or install without system-wide Electron.
-- A FLACo! account to sign in and download music.
-- The Discord desktop app, if you want to use Rich Presence.
+- A FLACo! account to sign in and download music. (Optional)
+- The Discord desktop app. (if you want to use Rich Presence)
 
 ## Installation
 
@@ -68,6 +67,28 @@ sudo pacman -Rns flaco-desktop
 
 > **Warning:** uninstalling removes the app, but settings and offline downloads may remain in your user data directory.
 
+### Debian, Ubuntu, and derivatives
+
+A `.deb` package depends on the `electron` package from your distribution. To build and install it from a checkout:
+
+```bash
+sudo apt update
+sudo apt install git nodejs binutils tar gzip
+git clone https://github.com/8noro/flaco-desktop.git
+cd flaco-desktop
+./packaging/build-deb.sh
+sudo apt install ./dist/flaco-desktop_*.deb
+```
+
+The build script creates a package for the current architecture under `dist/`. `apt` installs Electron as a package dependency. Once installed, launch **FLACo!** from the applications menu or run `flaco-desktop`. Remove it with `sudo apt remove flaco-desktop`.
+
+The `.deb` can also be attached to a GitHub Release for direct downloads. For installation and updates through `apt` without downloading each release manually, the package must additionally be published in a signed APT repository.
+
+## Windows (secondary platform)
+
+Linux is FLACo! Desktop's target platform. Windows builds are provided as a best-effort option and may have platform-specific issues or receive less testing.
+
+Just run the .exe installer provided in the releases page (or [here](https://release-assets.githubusercontent.com/github-production-release-asset/1420004155/205cb7ab-e6eb-4b97-b3de-834740ed3b00?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-11-02T22%3A02%3A22Z&rscd=attachment%3B+filename%3DFLACo-1.2.0-win-x64-setup.exe&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-11-02T21%3A02%3A08Z&ske=2026-11-02T22%3A02%3A22Z&sks=b&skv=2018-11-09&sig=dWzPuw%2F0zSHRA%2FaE3mMF154Sx6l%2BwuOURF4%2BTv9R3i8%3D&jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmVsZWFzZS1hc3NldHMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIiwia2V5Ijoia2V5MSIsImV4cCI6MTc5MzY1NzI0NywibmJmIjoxNzkzNjUzNjQ3LCJwYXRoIjoicmVsZWFzZWFzc2V0cHJvZHVjdGlvbi5ibG9iLmNvcmUud2luZG93cy5uZXQifQ.hb0fZ8-dR1PNdfl7HBg7spYDXH8sUFGf-Gi9C5htoPE&response-content-disposition=attachment%3B%20filename%3DFLACo-1.2.0-win-x64-setup.exe&response-content-type=application%2Foctet-stream))
 ## Run from source
 
 ```bash
